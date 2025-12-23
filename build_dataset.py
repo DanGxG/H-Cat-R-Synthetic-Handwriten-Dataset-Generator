@@ -99,7 +99,11 @@ def _generate_single_image(task, target_height=128):
         return metadata_entry
 
     except Exception as e:
-        # Retornar None si falla
+        # Retornar None si falla, pero registrar el error
+        import sys
+        print(f"\n[ERROR] Worker failed: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return None
 
 
@@ -470,13 +474,21 @@ class SyntheticDatasetBuilder:
                         img_filename = f"{counters[split_name]:08d}.png"
                         counters[split_name] += 1
 
+                        # Crear diccionarios serializables (solo strings, no objetos Path)
                         task = {
                             'text': text_to_render,
                             'font_path': str(font_info['path']),
                             'split_dir': str(split_dir),
                             'img_filename': img_filename,
-                            'text_data': text_data,
-                            'font_info': font_info,
+                            'text_data': {
+                                'book': text_data['book'],
+                                'file': text_data.get('file', '')
+                            },
+                            'font_info': {
+                                'name': font_info['name'],
+                                'category': font_info['category'],
+                                'style': font_info['style']
+                            },
                             'mode': self.mode,
                             'split_name': split_name
                         }
@@ -504,14 +516,23 @@ class SyntheticDatasetBuilder:
             # Usar imap_unordered para mejor rendimiento y load balancing
             # imap_unordered distribuye tareas dinámicamente (no estático)
             results = []
-            for result in tqdm(
-                pool.imap_unordered(worker_fn, tasks, chunksize=optimal_chunksize),
-                total=len(tasks),
-                desc="Generando imágenes",
-                unit="img"
-            ):
+
+            # NOTA: tqdm causa deadlocks con multiprocessing en Windows/Linux
+            # Usar contador simple en su lugar
+            print(f"\n  Procesando {len(tasks):,} tareas...")
+            print(f"  Iniciando workers...", flush=True)
+            processed = 0
+            report_interval = max(500, len(tasks) // 200)  # Reportar cada 0.5% o 500 items
+
+            print(f"  Workers iniciados, esperando resultados...", flush=True)
+            for result in pool.imap_unordered(worker_fn, tasks, chunksize=optimal_chunksize):
                 if result is not None:
                     results.append(result)
+
+                processed += 1
+                if processed % report_interval == 0 or processed == len(tasks):
+                    percent = (processed / len(tasks)) * 100
+                    print(f"  Progreso: {processed:,}/{len(tasks):,} ({percent:.1f}%)", flush=True)
 
         # Organizar metadata por split (thread-safe, en proceso principal)
         for result in results:
