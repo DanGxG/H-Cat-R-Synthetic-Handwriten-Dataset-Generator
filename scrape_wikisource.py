@@ -191,7 +191,7 @@ class WikisourceScraper:
         if self.verbose:
             print(f"    [SAVED] {txt_file.name} ({content['num_lines']} líneas, {content['num_words']} palabras)")
 
-    def scrape_all(self, max_books=None):
+    def scrape_all(self, max_books=None, start_from_book=None):
         """Scrape completo de Wikisource catalán"""
         print("=" * 60)
         print("WIKISOURCE CATALÁN - SCRAPER DE LIBROS VALIDADOS")
@@ -204,6 +204,24 @@ class WikisourceScraper:
         if not books:
             print("[ERROR] No se encontraron libros")
             return
+
+        # Si se especifica un libro de inicio, empezar desde el siguiente
+        if start_from_book:
+            # Buscar el libro en la lista
+            found_index = None
+            for idx, book in enumerate(books):
+                if start_from_book.lower() in book['title'].lower():
+                    found_index = idx
+                    print(f"\n[INFO] Encontrado libro de referencia: {book['title']}")
+                    break
+
+            if found_index is not None:
+                # Empezar desde el siguiente libro
+                books = books[found_index + 1:]
+                print(f"[INFO] Empezando desde el siguiente libro (saltando {found_index + 1} libros)")
+            else:
+                print(f"\n[WARNING] No se encontró el libro '{start_from_book}'")
+                print("[INFO] Se procesarán todos los libros")
 
         # Limitar número de libros si se especifica
         if max_books:
@@ -279,6 +297,7 @@ def main():
     )
     parser.add_argument('--output-dir', default='data', help='Directorio de salida (default: data)')
     parser.add_argument('--max-books', type=int, default=None, help='Número máximo de libros a procesar')
+    parser.add_argument('--start-from-book', type=str, default=None, help='Título del libro desde el cual empezar (scrapeará desde el siguiente)')
     parser.add_argument('--delay', type=float, default=1.0, help='Delay entre requests en segundos (default: 1.0)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Mostrar información detallada')
 
@@ -290,7 +309,7 @@ def main():
         verbose=args.verbose
     )
 
-    scraper.scrape_all(max_books=args.max_books)
+    scraper.scrape_all(max_books=args.max_books, start_from_book=args.start_from_book)
 
 if __name__ == "__main__":
     main()

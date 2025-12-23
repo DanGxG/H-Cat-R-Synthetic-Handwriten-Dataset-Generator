@@ -8,6 +8,7 @@ import os
 import shutil
 from pathlib import Path
 from fontTools.ttLib import TTFont
+from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import argparse
 
@@ -49,24 +50,56 @@ class FontVerifier:
         self.invalid_fonts = []  # Store info about invalid fonts
 
     def check_font_file(self, font_path):
-        """Check if a font file supports all required characters"""
+        """
+        Check if a font file supports all required characters
+        Uses both cmap check AND actual rendering test
+        """
         try:
+            # Step 1: Check cmap (character mapping table)
             font = TTFont(str(font_path))
             cmap = font.getBestCmap()
 
             if not cmap:
                 return False, "No character map found"
 
-            # Check for all required characters
-            missing = []
+            # Check for all required characters in cmap
+            missing_in_cmap = []
             for codepoint, (name, char) in self.required_chars.items():
                 if codepoint not in cmap:
-                    missing.append(char)
+                    missing_in_cmap.append(char)
 
-            if missing:
-                return False, f"Missing: {', '.join(missing)}"
+            if missing_in_cmap:
+                return False, f"Missing in cmap: {', '.join(missing_in_cmap)}"
 
-            return True, "All characters supported"
+            # Step 2: Test actual rendering with PIL (more robust check)
+            # This catches fonts that have cmap entries but fail to render
+            try:
+                pil_font = ImageFont.truetype(str(font_path), 32)
+                test_img = Image.new('RGB', (200, 50), 'white')
+                draw = ImageDraw.Draw(test_img)
+
+                # Test each required character
+                cannot_render = []
+                for codepoint, (name, char) in self.required_chars.items():
+                    try:
+                        # Try to get bounding box - if it fails, font can't render it
+                        bbox = draw.textbbox((0, 0), char, font=pil_font)
+                        width = bbox[2] - bbox[0]
+
+                        # Some fonts have glyphs with 0 width for missing chars
+                        if width <= 0:
+                            cannot_render.append(char)
+
+                    except Exception:
+                        cannot_render.append(char)
+
+                if cannot_render:
+                    return False, f"Cannot render: {', '.join(cannot_render)}"
+
+            except Exception as e:
+                return False, f"PIL rendering error: {str(e)}"
+
+            return True, "All characters supported and renderable"
 
         except Exception as e:
             return False, f"Error: {str(e)}"
