@@ -110,7 +110,8 @@ def _generate_single_image(task, target_height=128):
 class SyntheticDatasetBuilder:
     def __init__(self, data_dir='data', fonts_dir='fonts', output_dir='output',
                  mode='lines', style='normal', verbose=False,
-                 train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None):
+                 train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None,
+                 category_filter=None):
         self.data_dir = Path(data_dir)
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
@@ -119,6 +120,7 @@ class SyntheticDatasetBuilder:
         self.verbose = verbose
         self.num_workers = num_workers
         self.max_fonts_per_category = max_fonts_per_category  # Límite de fuentes por categoría
+        self.category_filter = category_filter  # Filtro de categoría específica
 
         # Proporciones de splits (train/val/test)
         self.train_split = train_split
@@ -154,12 +156,21 @@ class SyntheticDatasetBuilder:
         """Escanea el directorio de fuentes y detecta las que tienen bold"""
         print("[1] Escaneando fuentes...")
 
+        if self.category_filter:
+            print(f"  [FILTRO] Solo usando categoría: {self.category_filter}")
+
         # Agrupar fuentes por categoría antes de aplicar límite
         fonts_by_category = defaultdict(list)
 
         # Recorrer todas las carpetas de fuentes
         for category_dir in self.fonts_dir.iterdir():
             if not category_dir.is_dir():
+                continue
+
+            # Aplicar filtro de categoría si está especificado
+            if self.category_filter and category_dir.name != self.category_filter:
+                if self.verbose:
+                    print(f"  [SKIP] Categoría {category_dir.name} (filtrada)")
                 continue
 
             for font_dir in category_dir.iterdir():
@@ -743,7 +754,8 @@ def main():
     )
     parser.add_argument('--data-dir', default='data', help='Directorio con textos (default: data)')
     parser.add_argument('--fonts-dir', default='fonts', help='Directorio con fuentes (default: fonts)')
-    parser.add_argument('--output-dir', default='output', help='Directorio de salida (default: output)')
+    parser.add_argument('--output-dir', default='output', help='Directorio base de salida (default: output)')
+    parser.add_argument('--output-name', default=None, help='Nombre personalizado para el output (ej: handwritten). Si no se especifica, usa el directorio base')
     parser.add_argument('--mode', choices=['lines', 'words'], default='lines',
                         help='Modo: lines (líneas completas) o words (palabras) (default: lines)')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
@@ -760,6 +772,8 @@ def main():
                         help='Número de workers paralelos (default: 1). Usa -1 para todos los cores')
     parser.add_argument('--max-fonts-per-category', type=int, default=None,
                         help='Número máximo de fuentes por categoría (default: todas)')
+    parser.add_argument('--category-filter', type=str, default=None,
+                        help='Filtrar por categoría específica (ej: Handwritten, Brush, Script)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Mostrar información detallada')
 
@@ -772,21 +786,33 @@ def main():
     elif num_workers < 1:
         num_workers = 1
 
+    # Determinar directorio de salida
+    if args.output_name:
+        output_dir = f"{args.output_dir}_{args.output_name}"
+    else:
+        output_dir = args.output_dir
+
     print("=" * 60)
     print("GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE")
     print("=" * 60)
+    if args.output_name:
+        print(f"Nombre de dataset: {args.output_name}")
+        print(f"Output: {output_dir}")
+    if args.category_filter:
+        print(f"Categoría: {args.category_filter}")
     print()
 
     builder = SyntheticDatasetBuilder(
         data_dir=args.data_dir,
         fonts_dir=args.fonts_dir,
-        output_dir=args.output_dir,
+        output_dir=output_dir,
         mode=args.mode,
         style=args.style,
         train_split=args.train_split,
         val_split=args.val_split,
         num_workers=num_workers,
         max_fonts_per_category=args.max_fonts_per_category,
+        category_filter=args.category_filter,
         verbose=args.verbose
     )
 

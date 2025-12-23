@@ -168,6 +168,15 @@ python build_dataset.py --mode lines --style normal --workers 8 -v
 # Limit fonts per category (e.g., 10 fonts from each: Handwritten, Script, Brush, etc.)
 python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
 
+# Generate dataset with only Handwritten fonts
+python build_dataset.py --mode lines --style normal --category-filter Handwritten --workers -1 -v
+
+# Generate dataset with custom output name (saves to output_handwritten/)
+python build_dataset.py --mode lines --style normal --output-name handwritten --workers -1 -v
+
+# Combine: only Handwritten fonts, saved to output_handwritten/
+python build_dataset.py --mode lines --style normal --category-filter Handwritten --output-name handwritten --max-fonts-per-category 20 --workers -1 -v
+
 # Full generation with all options
 python build_dataset.py \
     --data-dir data \
@@ -192,6 +201,8 @@ python build_dataset.py \
 - `--val-split`: Validation proportion - default: `0.1` (10%)
 - `--max-texts`: Maximum number of texts to use
 - `--max-fonts-per-category`: Maximum fonts per category (e.g., Handwritten, Script, Brush)
+- `--category-filter`: Filter by specific category (e.g., Handwritten, Brush, Script, Calligraphy)
+- `--output-name`: Custom name for output directory (e.g., `handwritten` → `output_handwritten`)
 - `-v, --verbose`: Show detailed information
 
 **Output Formats:**
@@ -435,6 +446,7 @@ The system guarantees **equitable distribution** among workers:
 
 ### Example Output with Verbose
 
+**Example 1: Limiting fonts per category**
 ```bash
 $ python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers 8 -v
 
@@ -483,6 +495,60 @@ Generando imágenes: 100%|████████████| 434560/434560 [1
 [SUCCESS] Dataset generado correctamente!
 ```
 
+**Example 2: Category filter with custom output name**
+```bash
+$ python build_dataset.py --mode lines --style normal --category-filter Handwritten --output-name handwritten --max-fonts-per-category 20 --workers 8 -v
+
+============================================================
+GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
+============================================================
+Nombre de dataset: handwritten
+Output: output_handwritten
+Categoría: Handwritten
+
+[1] Escaneando fuentes...
+  [FILTRO] Solo usando categoría: Handwritten
+  [SKIP] Categoría Brush (filtrada)
+  [SKIP] Categoría Calligraphy (filtrada)
+  [SKIP] Categoría Script (filtrada)
+  [SKIP] Categoría School (filtrada)
+  [SKIP] Categoría Various (filtrada)
+
+  [OK] Fuentes escaneadas:
+    Con bold: 50
+    Sin bold: 267
+    Fuentes usadas (normal): 20
+    Fuentes saltadas: 297
+
+  [INFO] Límite por categoría: 20
+
+  Fuentes por categoría:
+    Handwritten: 20/267 (limitado)
+
+[2] Cargando textos...
+  [OK] 179614 líneas de texto cargadas (5 palabras por línea)
+
+[3] Generando dataset (lines)...
+  [INFO] Generando: 179614 textos × 20 fuentes
+  [INFO] Splits: train=80%, val=10%, test=10%
+  [INFO] Usando 8 workers en paralelo
+  Total imágenes esperadas: 3,592,280
+
+  Procesando 3,592,280 tareas...
+  Iniciando workers...
+  Workers iniciados, esperando resultados...
+  Progreso: 17,961/3,592,280 (0.5%)
+  Progreso: 35,922/3,592,280 (1.0%)
+  ...
+
+  [OK] 3,592,280 imágenes generadas
+    Train: 2,873,824
+    Validation: 359,228
+    Test: 359,228
+
+[SUCCESS] Dataset generado correctamente en output_handwritten/!
+```
+
 ---
 
 ## 💡 Tips and Best Practices
@@ -506,6 +572,84 @@ python build_dataset.py --mode lines --max-fonts-per-category 5 --workers -1 -v
 
 # Production dataset with 100 fonts per category
 python build_dataset.py --mode lines --max-fonts-per-category 100 --workers -1 -v
+```
+
+---
+
+### Filtering by Font Category
+
+Generate specialized datasets for specific font styles:
+
+**Available categories:** `Handwritten`, `Script`, `Brush`, `Calligraphy`, `School`, `Typewriter`, `Various`, `Sans Serif`, `Serif`, etc.
+
+```bash
+# Dataset with ONLY Handwritten fonts
+python build_dataset.py --mode lines --category-filter Handwritten --workers -1 -v
+
+# Dataset with ONLY Brush fonts
+python build_dataset.py --mode lines --category-filter Brush --workers -1 -v
+
+# Dataset with ONLY Script fonts + limit to 10 fonts
+python build_dataset.py --mode lines --category-filter Script --max-fonts-per-category 10 --workers -1 -v
+```
+
+**Benefits:**
+- ✅ Focus on specific handwriting styles
+- ✅ Create specialized models (e.g., cursive-only, print-only)
+- ✅ Faster generation (fewer fonts = less time)
+- ✅ Better style consistency in training data
+
+---
+
+### Custom Output Names
+
+Organize multiple datasets with custom names:
+
+```bash
+# Generates dataset in output_handwritten/
+python build_dataset.py --output-name handwritten --workers -1 -v
+
+# Generates dataset in output_brush_bold/
+python build_dataset.py --output-name brush_bold --style bold --workers -1 -v
+
+# Default: generates in output/
+python build_dataset.py --workers -1 -v
+```
+
+**Directory structure:**
+```
+project/
+├── output/                    # Default dataset (all fonts)
+├── output_handwritten/        # Handwritten-only dataset
+├── output_brush/              # Brush-only dataset
+├── output_script_bold/        # Script fonts in bold
+└── output_school/             # School/print fonts
+```
+
+**Use case - Generate multiple specialized datasets:**
+```bash
+# 1. Handwritten dataset
+python build_dataset.py \
+    --category-filter Handwritten \
+    --output-name handwritten \
+    --max-fonts-per-category 50 \
+    --workers -1 -v
+
+# 2. Brush dataset
+python build_dataset.py \
+    --category-filter Brush \
+    --output-name brush \
+    --max-fonts-per-category 30 \
+    --workers -1 -v
+
+# 3. Script dataset
+python build_dataset.py \
+    --category-filter Script \
+    --output-name script \
+    --max-fonts-per-category 40 \
+    --workers -1 -v
+
+# Now you have 3 specialized datasets to train different models!
 ```
 
 ---
@@ -585,8 +729,19 @@ python build_dataset.py --mode lines --style normal --workers -1 -v
 # 4b. Generate dataset with limited fonts per category (faster, good for testing)
 python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
 
+# 4c. Generate specialized dataset (Handwritten only)
+python build_dataset.py --mode lines --category-filter Handwritten --output-name handwritten --workers -1 -v
+
+# 4d. Generate multiple specialized datasets
+python build_dataset.py --category-filter Handwritten --output-name handwritten --max-fonts-per-category 50 --workers -1 -v
+python build_dataset.py --category-filter Brush --output-name brush --max-fonts-per-category 30 --workers -1 -v
+python build_dataset.py --category-filter Script --output-name script --max-fonts-per-category 40 --workers -1 -v
+
 # 5. Load dataset
 python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output'); print(ds)"
+
+# 5b. Load specialized dataset
+python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output_handwritten'); print(ds)"
 ```
 
 **Ready to generate your synthetic dataset!** 🚀
