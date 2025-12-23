@@ -106,7 +106,7 @@ def _generate_single_image(task, target_height=128):
 class SyntheticDatasetBuilder:
     def __init__(self, data_dir='data', fonts_dir='fonts', output_dir='output',
                  mode='lines', style='normal', verbose=False,
-                 train_split=0.8, val_split=0.1, num_workers=1):
+                 train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None):
         self.data_dir = Path(data_dir)
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
@@ -114,6 +114,7 @@ class SyntheticDatasetBuilder:
         self.style = style  # 'normal' o 'bold'
         self.verbose = verbose
         self.num_workers = num_workers
+        self.max_fonts_per_category = max_fonts_per_category  # Límite de fuentes por categoría
 
         # Proporciones de splits (train/val/test)
         self.train_split = train_split
@@ -148,6 +149,9 @@ class SyntheticDatasetBuilder:
     def scan_fonts(self):
         """Escanea el directorio de fuentes y detecta las que tienen bold"""
         print("[1] Escaneando fuentes...")
+
+        # Agrupar fuentes por categoría antes de aplicar límite
+        fonts_by_category = defaultdict(list)
 
         # Recorrer todas las carpetas de fuentes
         for category_dir in self.fonts_dir.iterdir():
@@ -188,41 +192,75 @@ class SyntheticDatasetBuilder:
                 else:
                     self.stats['fonts_without_bold'] += 1
 
-                # Decidir si usar esta fuente según el estilo requerido
+                # Preparar información de fuente según el estilo requerido
+                font_info = None
                 if self.style == 'bold':
                     if has_bold:
-                        # Usar versión bold
-                        self.fonts.append({
+                        font_info = {
                             'path': bold_fonts[0],
                             'name': font_dir.name,
                             'category': category_dir.name,
                             'style': 'bold'
-                        })
-                        self.stats['fonts_used'] += 1
+                        }
                     else:
                         self.stats['fonts_skipped'] += 1
                         if self.verbose:
                             print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin bold")
                 elif self.style == 'normal':
                     if normal_fonts:
-                        # Usar versión normal
-                        self.fonts.append({
+                        font_info = {
                             'path': normal_fonts[0],
                             'name': font_dir.name,
                             'category': category_dir.name,
                             'style': 'normal'
-                        })
-                        self.stats['fonts_used'] += 1
+                        }
                     else:
                         self.stats['fonts_skipped'] += 1
                         if self.verbose:
                             print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin normal")
 
+                # Agregar a la categoría correspondiente
+                if font_info:
+                    fonts_by_category[category_dir.name].append(font_info)
+
+        # Aplicar límite por categoría si está especificado
+        category_stats = {}
+        for category_name, category_fonts in fonts_by_category.items():
+            available = len(category_fonts)
+
+            if self.max_fonts_per_category is not None and available > self.max_fonts_per_category:
+                # Mezclar aleatoriamente y tomar solo el límite
+                random.shuffle(category_fonts)
+                selected_fonts = category_fonts[:self.max_fonts_per_category]
+                used = len(selected_fonts)
+            else:
+                # Usar todas las disponibles
+                selected_fonts = category_fonts
+                used = available
+
+            self.fonts.extend(selected_fonts)
+            category_stats[category_name] = {'available': available, 'used': used}
+
+        # Actualizar estadísticas globales
+        self.stats['fonts_used'] = len(self.fonts)
+
+        # Mostrar resumen
         print(f"  [OK] Fuentes escaneadas:")
         print(f"    Con bold: {self.stats['fonts_with_bold']}")
         print(f"    Sin bold: {self.stats['fonts_without_bold']}")
         print(f"    Fuentes usadas ({self.style}): {self.stats['fonts_used']}")
         print(f"    Fuentes saltadas: {self.stats['fonts_skipped']}")
+
+        # Mostrar estadísticas por categoría
+        if self.max_fonts_per_category is not None:
+            print(f"\n  [INFO] Límite por categoría: {self.max_fonts_per_category}")
+        print(f"\n  Fuentes por categoría:")
+        for category_name in sorted(category_stats.keys()):
+            stats = category_stats[category_name]
+            if stats['used'] < stats['available']:
+                print(f"    {category_name}: {stats['used']}/{stats['available']} (limitado)")
+            else:
+                print(f"    {category_name}: {stats['used']}/{stats['available']}")
 
     def load_texts(self):
         """Carga todos los textos del directorio data"""
@@ -699,6 +737,8 @@ def main():
                         help='Altura de imagen en píxeles (default: 128, compatible con IAM/TrOCR)')
     parser.add_argument('--workers', '-j', type=int, default=1,
                         help='Número de workers paralelos (default: 1). Usa -1 para todos los cores')
+    parser.add_argument('--max-fonts-per-category', type=int, default=None,
+                        help='Número máximo de fuentes por categoría (default: todas)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Mostrar información detallada')
 
@@ -725,6 +765,7 @@ def main():
         train_split=args.train_split,
         val_split=args.val_split,
         num_workers=num_workers,
+        max_fonts_per_category=args.max_fonts_per_category,
         verbose=args.verbose
     )
 

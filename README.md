@@ -165,6 +165,9 @@ python build_dataset.py --mode lines --style normal --workers -1 -v
 # Generation with 8 specific cores
 python build_dataset.py --mode lines --style normal --workers 8 -v
 
+# Limit fonts per category (e.g., 10 fonts from each: Handwritten, Script, Brush, etc.)
+python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
+
 # Full generation with all options
 python build_dataset.py \
     --data-dir data \
@@ -175,6 +178,7 @@ python build_dataset.py \
     --train-split 0.8 \
     --val-split 0.1 \
     --font-size 128 \
+    --max-fonts-per-category 50 \
     --workers -1 \
     -v
 ```
@@ -187,6 +191,7 @@ python build_dataset.py \
 - `--train-split`: Training proportion - default: `0.8` (80%)
 - `--val-split`: Validation proportion - default: `0.1` (10%)
 - `--max-texts`: Maximum number of texts to use
+- `--max-fonts-per-category`: Maximum fonts per category (e.g., Handwritten, Script, Brush)
 - `-v, --verbose`: Show detailed information
 
 **Output Formats:**
@@ -431,7 +436,7 @@ The system guarantees **equitable distribution** among workers:
 ### Example Output with Verbose
 
 ```bash
-$ python build_dataset.py --mode lines --style normal --workers 8 -v
+$ python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers 8 -v
 
 ============================================================
 GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
@@ -441,29 +446,66 @@ GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
   [OK] Fuentes escaneadas:
     Con bold: 523
     Sin bold: 1477
-    Fuentes usadas (normal): 1477
+    Fuentes usadas (normal): 80
     Fuentes saltadas: 523
+
+  [INFO] Límite por categoría: 10
+
+  Fuentes por categoría:
+    Brush: 10/250 (limitado)
+    Calligraphy: 10/180 (limitado)
+    Celtic: 5/5
+    Handwritten: 10/500 (limitado)
+    Script: 10/300 (limitado)
+    School: 10/150 (limitado)
+    Typewriter: 10/42 (limitado)
+    Various: 10/50 (limitado)
 
 [2] Cargando textos...
   [OK] 5432 líneas de texto cargadas (5 palabras por línea)
 
 [3] Generando dataset (lines)...
-  [INFO] Generando: 5432 textos × 1477 fuentes
+  [INFO] Generando: 5432 textos × 80 fuentes
   [INFO] Splits: train=80%, val=10%, test=10%
   [INFO] Usando 8 workers en paralelo
-  Total imágenes esperadas: 8,023,264
+  Total imágenes esperadas: 434,560
 
-  [INFO] Total tareas: 8,023,264
-  [INFO] Chunksize: 250,727
+  [INFO] Total tareas: 434,560
+  [INFO] Chunksize: 13,580
 
-Generando imágenes: 100%|████████████| 8023264/8023264 [45:23<00:00, 2945.67img/s]
+Generando imágenes: 100%|████████████| 434560/434560 [12:45<00:00, 568.32img/s]
 
-  [OK] 8,023,264 imágenes generadas
-    Train: 6,418,611
-    Validation: 802,326
-    Test: 802,327
+  [OK] 434,560 imágenes generadas
+    Train: 347,648
+    Validation: 43,456
+    Test: 43,456
 
 [SUCCESS] Dataset generado correctamente!
+```
+
+---
+
+## 💡 Tips and Best Practices
+
+### Limiting Fonts Per Category
+
+If you have many fonts and want to:
+- **Test the pipeline quickly**: Use `--max-fonts-per-category 5` or `10`
+- **Create a balanced dataset**: Use `--max-fonts-per-category 50` to ensure equal representation
+- **Reduce dataset size**: Limit fonts per category instead of limiting texts
+
+The system will:
+- ✅ Select fonts **randomly** from each category (Handwritten, Script, Brush, etc.)
+- ✅ Use **all available fonts** if a category has fewer than the limit
+- ✅ Show clear statistics: `Handwritten: 10/500 (limitado)` or `Celtic: 5/5`
+
+**Example:**
+```bash
+# Quick test with 5 fonts per category
+python build_dataset.py --mode lines --max-fonts-per-category 5 --workers -1 -v
+
+# Production dataset with 100 fonts per category
+python build_dataset.py --mode lines --max-fonts-per-category 100 --workers -1 -v
 ```
 
 ---
@@ -539,6 +581,9 @@ python verify_and_clean_fonts.py -v
 
 # 4. Generate dataset (PARALLEL - RECOMMENDED)
 python build_dataset.py --mode lines --style normal --workers -1 -v
+
+# 4b. Generate dataset with limited fonts per category (faster, good for testing)
+python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
 
 # 5. Load dataset
 python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output'); print(ds)"
