@@ -12,15 +12,13 @@ This project allows you to:
 
 ```
 .
-├── scrape_wikisource.py          # Wikisource text scraper
-├── scrape_dafont.py               # DaFont font scraper
 ├── download_fonts.py              # Font downloader
 ├── verify_and_clean_fonts.py     # Font verifier and cleaner
 ├── verify_and_clean_books.py     # Text verifier and cleaner
 ├── build_dataset.py               # Synthetic dataset generator
 ├── test_font_rendering.py        # Font rendering test utility
-├── data/                          # Scraped texts (by book)
-├── fonts/                         # Downloaded fonts (by category)
+├── data/                          # Texts (by book)
+├── fonts/                         # Fonts (by category)
 └── output/                        # Generated dataset
     ├── train/
     │   ├── 00000000.png
@@ -51,43 +49,16 @@ pip install -r requirements.txt
 
 Main libraries:
 - `Pillow` - Image generation
-- `requests` - Web scraping
-- `beautifulsoup4` - HTML parsing
 - `fontTools` - Font manipulation
 - `tqdm` - Progress bars
 - `datasets` - (Optional) For loading dataset with HuggingFace
 
 ## 📖 Complete Workflow
 
-### 1. Scrape Texts from Wikisource
+### 1. Download Handwriting Fonts
 
 ```bash
-# Scrape all validated books
-python scrape_wikisource.py -v
-
-# Scrape with limit
-python scrape_wikisource.py --max-books 10 -v
-
-# Start from a specific book (continue scraping)
-python scrape_wikisource.py --start-from-book "Tortosa" -v
-
-# Additional options
-python scrape_wikisource.py --output-dir data --delay 1.0 -v
-```
-
-**Parameters:**
-- `--output-dir`: Output directory (default: `data`)
-- `--max-books`: Maximum number of books to process
-- `--start-from-book`: Book title to start from (will scrape from the next one)
-- `--delay`: Delay between requests in seconds (default: 1.0)
-- `-v, --verbose`: Show detailed information
-
----
-
-### 2. Download Handwriting Fonts
-
-```bash
-# Download fonts from DaFont (handwriting category)
+# Download fonts
 python download_fonts.py -v
 
 # Download with limit
@@ -99,14 +70,14 @@ python download_fonts.py --output-dir fonts --delay 2.0 -v
 
 **Parameters:**
 - `--output-dir`: Output directory (default: `fonts`)
-- `--max-pages`: Maximum pages to scrape per category
+- `--max-pages`: Maximum pages per category
 - `--max-fonts`: Maximum fonts to download
 - `--delay`: Delay between requests in seconds (default: 2.0)
 - `-v, --verbose`: Show detailed information
 
 ---
 
-### 3. Verify and Clean Fonts
+### 2. Verify and Clean Fonts
 
 **IMPORTANT!** This step removes fonts that cannot render Catalan characters or numbers.
 
@@ -139,10 +110,10 @@ The script performs **double verification**:
 
 ---
 
-### 4. Verify and Clean Texts (Optional)
+### 3. Verify and Clean Texts (Optional)
 
 ```bash
-# Verify scraped books
+# Verify books
 python verify_and_clean_books.py -v
 
 # View statistics without cleaning
@@ -151,7 +122,7 @@ python verify_and_clean_books.py --no-clean -v
 
 ---
 
-### 5. Generate Synthetic Dataset
+### 4. Generate Synthetic Dataset
 
 **Main step!** Generates the dataset in HuggingFace format compatible with TrOCR.
 
@@ -217,8 +188,8 @@ python build_dataset.py \
 
 ```bash
 # Check how many cores you have
-echo %NUMBER_OF_PROCESSORS%  # Windows
 nproc                        # Linux/Mac
+echo %NUMBER_OF_PROCESSORS%  # Windows
 ```
 
 ---
@@ -444,219 +415,11 @@ The system guarantees **equitable distribution** among workers:
 
 **Recommendation**: Use `workers = number_of_cores - 2` to leave room for the OS.
 
-### Example Output with Verbose
-
-**Example 1: Limiting fonts per category**
-```bash
-$ python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers 8 -v
-
-============================================================
-GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
-============================================================
-
-[1] Escaneando fuentes...
-  [OK] Fuentes escaneadas:
-    Con bold: 523
-    Sin bold: 1477
-    Fuentes usadas (normal): 80
-    Fuentes saltadas: 523
-
-  [INFO] Límite por categoría: 10
-
-  Fuentes por categoría:
-    Brush: 10/250 (limitado)
-    Calligraphy: 10/180 (limitado)
-    Celtic: 5/5
-    Handwritten: 10/500 (limitado)
-    Script: 10/300 (limitado)
-    School: 10/150 (limitado)
-    Typewriter: 10/42 (limitado)
-    Various: 10/50 (limitado)
-
-[2] Cargando textos...
-  [OK] 5432 líneas de texto cargadas (5 palabras por línea)
-
-[3] Generando dataset (lines)...
-  [INFO] Generando: 5432 textos × 80 fuentes
-  [INFO] Splits: train=80%, val=10%, test=10%
-  [INFO] Usando 8 workers en paralelo
-  Total imágenes esperadas: 434,560
-
-  [INFO] Total tareas: 434,560
-  [INFO] Chunksize: 13,580
-
-Generando imágenes: 100%|████████████| 434560/434560 [12:45<00:00, 568.32img/s]
-
-  [OK] 434,560 imágenes generadas
-    Train: 347,648
-    Validation: 43,456
-    Test: 43,456
-
-[SUCCESS] Dataset generado correctamente!
-```
-
-**Example 2: Category filter with custom output name**
-```bash
-$ python build_dataset.py --mode lines --style normal --category-filter Handwritten --output-name handwritten --max-fonts-per-category 20 --workers 8 -v
-
-============================================================
-GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
-============================================================
-Nombre de dataset: handwritten
-Output: output_handwritten
-Categoría: Handwritten
-
-[1] Escaneando fuentes...
-  [FILTRO] Solo usando categoría: Handwritten
-  [SKIP] Categoría Brush (filtrada)
-  [SKIP] Categoría Calligraphy (filtrada)
-  [SKIP] Categoría Script (filtrada)
-  [SKIP] Categoría School (filtrada)
-  [SKIP] Categoría Various (filtrada)
-
-  [OK] Fuentes escaneadas:
-    Con bold: 50
-    Sin bold: 267
-    Fuentes usadas (normal): 20
-    Fuentes saltadas: 297
-
-  [INFO] Límite por categoría: 20
-
-  Fuentes por categoría:
-    Handwritten: 20/267 (limitado)
-
-[2] Cargando textos...
-  [OK] 179614 líneas de texto cargadas (5 palabras por línea)
-
-[3] Generando dataset (lines)...
-  [INFO] Generando: 179614 textos × 20 fuentes
-  [INFO] Splits: train=80%, val=10%, test=10%
-  [INFO] Usando 8 workers en paralelo
-  Total imágenes esperadas: 3,592,280
-
-  Procesando 3,592,280 tareas...
-  Iniciando workers...
-  Workers iniciados, esperando resultados...
-  Progreso: 17,961/3,592,280 (0.5%)
-  Progreso: 35,922/3,592,280 (1.0%)
-  ...
-
-  [OK] 3,592,280 imágenes generadas
-    Train: 2,873,824
-    Validation: 359,228
-    Test: 359,228
-
-[SUCCESS] Dataset generado correctamente en output_handwritten/!
-```
-
----
-
-## 💡 Tips and Best Practices
-
-### Limiting Fonts Per Category
-
-If you have many fonts and want to:
-- **Test the pipeline quickly**: Use `--max-fonts-per-category 5` or `10`
-- **Create a balanced dataset**: Use `--max-fonts-per-category 50` to ensure equal representation
-- **Reduce dataset size**: Limit fonts per category instead of limiting texts
-
-The system will:
-- ✅ Select fonts **randomly** from each category (Handwritten, Script, Brush, etc.)
-- ✅ Use **all available fonts** if a category has fewer than the limit
-- ✅ Show clear statistics: `Handwritten: 10/500 (limitado)` or `Celtic: 5/5`
-
-**Example:**
-```bash
-# Quick test with 5 fonts per category
-python build_dataset.py --mode lines --max-fonts-per-category 5 --workers -1 -v
-
-# Production dataset with 100 fonts per category
-python build_dataset.py --mode lines --max-fonts-per-category 100 --workers -1 -v
-```
-
----
-
-### Filtering by Font Category
-
-Generate specialized datasets for specific font styles:
-
-**Available categories:** `Handwritten`, `Script`, `Brush`, `Calligraphy`, `School`, `Typewriter`, `Various`, `Sans Serif`, `Serif`, etc.
-
-```bash
-# Dataset with ONLY Handwritten fonts
-python build_dataset.py --mode lines --category-filter Handwritten --workers -1 -v
-
-# Dataset with ONLY Brush fonts
-python build_dataset.py --mode lines --category-filter Brush --workers -1 -v
-
-# Dataset with ONLY Script fonts + limit to 10 fonts
-python build_dataset.py --mode lines --category-filter Script --max-fonts-per-category 10 --workers -1 -v
-```
-
-**Benefits:**
-- ✅ Focus on specific handwriting styles
-- ✅ Create specialized models (e.g., cursive-only, print-only)
-- ✅ Faster generation (fewer fonts = less time)
-- ✅ Better style consistency in training data
-
----
-
-### Custom Output Names
-
-Organize multiple datasets with custom names:
-
-```bash
-# Generates dataset in output_handwritten/
-python build_dataset.py --output-name handwritten --workers -1 -v
-
-# Generates dataset in output_brush_bold/
-python build_dataset.py --output-name brush_bold --style bold --workers -1 -v
-
-# Default: generates in output/
-python build_dataset.py --workers -1 -v
-```
-
-**Directory structure:**
-```
-project/
-├── output/                    # Default dataset (all fonts)
-├── output_handwritten/        # Handwritten-only dataset
-├── output_brush/              # Brush-only dataset
-├── output_script_bold/        # Script fonts in bold
-└── output_school/             # School/print fonts
-```
-
-**Use case - Generate multiple specialized datasets:**
-```bash
-# 1. Handwritten dataset
-python build_dataset.py \
-    --category-filter Handwritten \
-    --output-name handwritten \
-    --max-fonts-per-category 50 \
-    --workers -1 -v
-
-# 2. Brush dataset
-python build_dataset.py \
-    --category-filter Brush \
-    --output-name brush \
-    --max-fonts-per-category 30 \
-    --workers -1 -v
-
-# 3. Script dataset
-python build_dataset.py \
-    --category-filter Script \
-    --output-name script \
-    --max-fonts-per-category 40 \
-    --workers -1 -v
-
-# Now you have 3 specialized datasets to train different models!
-```
-
 ---
 
 ## 🐛 Troubleshooting
 
-### Fonts generate "unknown" characters (�)
+### Fonts generate "unknown" characters (â–')
 
 **Solution**: Run the font verifier with rendering:
 
@@ -664,7 +427,7 @@ python build_dataset.py \
 python verify_and_clean_fonts.py -v
 ```
 
-The script now performs double verification (cmap + actual rendering).
+The script performs double verification (cmap + actual rendering).
 
 ### Dataset generation is very slow
 
@@ -680,14 +443,6 @@ python build_dataset.py --workers -1 -v
 - You're running the script as `python build_dataset.py` (not importing it)
 - You have the latest code version with `mp.freeze_support()`
 
-### Want to continue scraping from where I left off
-
-**Solution**: Use `--start-from-book`:
-
-```bash
-python scrape_wikisource.py --start-from-book "Last_scraped_book" -v
-```
-
 ---
 
 ## 📚 References
@@ -701,7 +456,7 @@ python scrape_wikisource.py --start-from-book "Last_scraped_book" -v
 
 ## 📄 License
 
-This project is for educational and research purposes. Downloaded fonts have their own licenses (check on DaFont). Wikisource texts are in the public domain or under free licenses.
+This project is for educational and research purposes. Fonts have their own individual licenses. Wikisource texts are in the public domain or under free licenses.
 
 ---
 
@@ -714,33 +469,30 @@ Suggestions and improvements are welcome. This is a research project for synthet
 ## ✨ Quick Commands (Cheatsheet)
 
 ```bash
-# 1. Scrape texts
-python scrape_wikisource.py -v
-
-# 2. Download fonts
+# 1. Download fonts
 python download_fonts.py -v
 
-# 3. Clean fonts
+# 2. Clean fonts
 python verify_and_clean_fonts.py -v
 
-# 4. Generate dataset (PARALLEL - RECOMMENDED)
+# 3. Generate dataset (PARALLEL - RECOMMENDED)
 python build_dataset.py --mode lines --style normal --workers -1 -v
 
-# 4b. Generate dataset with limited fonts per category (faster, good for testing)
+# 3b. Generate dataset with limited fonts per category (faster, good for testing)
 python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
 
-# 4c. Generate specialized dataset (Handwritten only)
+# 3c. Generate specialized dataset (Handwritten only)
 python build_dataset.py --mode lines --category-filter Handwritten --output-name handwritten --workers -1 -v
 
-# 4d. Generate multiple specialized datasets
+# 3d. Generate multiple specialized datasets
 python build_dataset.py --category-filter Handwritten --output-name handwritten --max-fonts-per-category 50 --workers -1 -v
 python build_dataset.py --category-filter Brush --output-name brush --max-fonts-per-category 30 --workers -1 -v
 python build_dataset.py --category-filter Script --output-name script --max-fonts-per-category 40 --workers -1 -v
 
-# 5. Load dataset
+# 4. Load dataset
 python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output'); print(ds)"
 
-# 5b. Load specialized dataset
+# 4b. Load specialized dataset
 python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output_handwritten'); print(ds)"
 ```
 
